@@ -22,6 +22,7 @@ def get_repo_deps_via_github(github_id: str) -> int:
         request = requests.get(
             "https://github.com/" + github_id + "/network/dependents"
         )
+
         if request.status_code != 200:
             log.info(
                 "Unable to find repo dependents via GitHub api: "
@@ -30,24 +31,31 @@ def get_repo_deps_via_github(github_id: str) -> int:
                 + str(request.status_code)
                 + ")"
             )
+
             return 0
         repo_deps = 0
         soup = BeautifulSoup(request.text, "html.parser")
         repo_deps_str = soup.find(string=re.compile(r"[0-9,]+\s+Repositories"))
+
         if repo_deps_str:
             count_search = re.search("([0-9,]+)", repo_deps_str, re.IGNORECASE)
+
             if count_search:
                 repo_deps += int(count_search.group(1).replace(",", ""))
         pkg_deps_str = soup.find(string=re.compile(r"[0-9,]+\s+Packages"))
+
         if pkg_deps_str:
             count_search = re.search("([0-9,]+)", pkg_deps_str, re.IGNORECASE)
+
             if count_search:
                 repo_deps += int(count_search.group(1).replace(",", ""))
+
         return repo_deps
     except Exception as ex:
         log.info(
             "Unable to find repo dependents via GitHub api: " + github_id, exc_info=ex
         )
+
         return 0
 
 
@@ -64,6 +72,7 @@ def get_contributors_via_github_api(
             + "/contributors?page=1&per_page=1&anon=True",
             headers={"Authorization": "token " + github_api_token},
         )
+
         if request.status_code != 200:
             log.info(
                 "Unable to find repo contributors via GitHub api: "
@@ -72,6 +81,7 @@ def get_contributors_via_github_api(
                 + str(request.status_code)
                 + ")"
             )
+
             return None
 
         if "Link" not in request.headers or not request.headers["Link"]:
@@ -80,8 +90,10 @@ def get_contributors_via_github_api(
         link_header = request.headers["Link"]
 
         contributor_count = 0
+
         for found_group in re.findall(r"\?page=([0-9]+)", link_header, re.IGNORECASE):
             contributor_count = max(contributor_count, int(found_group))
+
         return contributor_count
     except Exception as ex:
         log.info(
@@ -504,33 +516,43 @@ def generate_github_details(project: Dict, configuration: Dict) -> str:
     if project.contributor_count:
         if metrics_md:
             metrics_md += " · "
-        metrics_md += "👨‍💻 " + str(utils.simplify_number(project.contributor_count))
-
+        metrics_title = utils.alt(
+            "Contributors count from GitHub",
+            "👨‍💻 " + str(utils.simplify_number(project.contributor_count)),
+        )
+        metrics_md += metrics_title
     if project.fork_count:
         if metrics_md:
             metrics_md += " · "
-        metrics_md += "🔀 " + str(utils.simplify_number(project.fork_count))
+        metrics_title = utils.alt(
+            "Fork count from GitHub",
+            "🔀 " + str(utils.simplify_number(project.fork_count)),
+        )
+        metrics_md += metrics_title
 
     if project.github_release_downloads:
         if metrics_md:
             metrics_md += " · "
-        metrics_md += "📥 " + str(
-            utils.simplify_number(project.github_release_downloads)
+        metrics_title = utils.alt(
+            utils.DOWNLOAD_COUNT_TEXT,
+            "📥 " + str(utils.simplify_number(project.github_release_downloads)),
         )
-
+        metrics_md += metrics_title
     if project.github_dependent_project_count:
         if metrics_md:
             metrics_md += " · "
-        metrics_md += "📦 " + str(
-            utils.simplify_number(project.github_dependent_project_count)
+        metrics_title = utils.alt(
+            utils.DEPENDENT_PROJECT_COUNT_TEXT,
+            "📦 " + str(utils.simplify_number(project.github_dependent_project_count)),
         )
-
+        metrics_md += metrics_title
     if project.open_issue_count and project.closed_issue_count:
         if metrics_md:
             metrics_md += " · "
         total_issues = project.closed_issue_count + project.open_issue_count
 
-        metrics_md += (
+        metrics_title = utils.alt(
+            "Issue count from GitHub",
             "📋 "
             + str(utils.simplify_number(total_issues))
             + " - "
@@ -543,14 +565,18 @@ def generate_github_details(project: Dict, configuration: Dict) -> str:
                     * 100
                 )
             )
-            + "% open"
+            + "% open",
         )
+        metrics_md += metrics_title
 
     if project.last_commit_pushed_at:
         if metrics_md:
             metrics_md += " · "
-        metrics_md += "⏱️ " + str(project.last_commit_pushed_at.strftime("%d.%m.%Y"))
-
+        metrics_title = utils.alt(
+            utils.LAST_UPDATE_TIMESTAMP_TEXT,
+            "⏱️ " + str(project.last_commit_pushed_at.strftime("%d.%m.%Y")),
+        )
+        metrics_md += metrics_title
     if metrics_md:
         metrics_md = " (" + metrics_md + ")"
 

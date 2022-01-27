@@ -4,6 +4,18 @@ import sys
 import textwrap
 from datetime import datetime
 
+DOWNLOAD_COUNT_TEXT = "Download count from package manager"
+DEPENDENT_PROJECT_COUNT_TEXT = "Number of dependent projects"
+LAST_UPDATE_TIMESTAMP_TEXT = "Last update timestamp on package manager"
+
+
+def alt(title: str, text: str, tag="span") -> str:
+    return '<{tag} title="{title}" alt="{title}">{text}</{tag}>'.format(
+        tag=tag,
+        title=title,
+        text=text,
+    )
+
 
 def simplify_str(text: str) -> str:
     return re.compile(r"[^a-zA-Z0-9]").sub("", text.strip()).lower()
@@ -20,9 +32,11 @@ def clean_whitespaces(text: str) -> str:
 def simplify_number(num: int) -> str:
     num_converted = float("{:.2g}".format(num))
     magnitude = 0
+
     while abs(num_converted) >= 1000:
         magnitude += 1
         num_converted /= 1000.0
+
     return "{}{}".format(
         "{:f}".format(num_converted).rstrip("0").rstrip("."),
         ["", "K", "M", "B", "T"][magnitude],

@@ -34,6 +34,7 @@ class CargoIntegration(BaseIntegration):
                 + quote(project_info.cargo_id, safe="")
             )
             request.text
+
             if request.status_code != 200:
                 log.info(
                     "Unable to find package via cargo api: "
@@ -42,12 +43,15 @@ class CargoIntegration(BaseIntegration):
                     + str(request.status_code)
                     + ")"
                 )
+
                 return
             cargo_packaged_details = Dict(request.json())
+
             if not cargo_packaged_details or not cargo_packaged_details.crate:
                 log.info(
                     "Unable to get package info via cargo api: " + project_info.cargo_id
                 )
+
                 return
 
             if cargo_packaged_details.crate.recent_downloads:
@@ -79,35 +83,43 @@ class CargoIntegration(BaseIntegration):
                 "Failed to request package via cargo api: " + project_info.cargo_id,
                 exc_info=ex,
             )
+
             return
 
     def generate_md_details(self, project: Dict, configuration: Dict) -> str:
         cargo_id = project.cargo_id
+
         if not cargo_id:
             return ""
 
         metrics_md = ""
+
         if project.cargo_monthly_downloads:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += (
+            metrics_md += utils.alt(
+                utils.DOWNLOAD_COUNT_TEXT,
                 "📥 "
                 + str(utils.simplify_number(project.cargo_monthly_downloads))
-                + " / month"
+                + " / month",
             )
 
         if project.cargo_dependent_project_count:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "📦 " + str(
-                utils.simplify_number(project.cargo_dependent_project_count)
+            metrics_md += utils.alt(
+                utils.DEPENDENT_PROJECT_COUNT_TEXT,
+                "📦 "
+                + str(utils.simplify_number(project.cargo_dependent_project_count)),
             )
 
         if project.cargo_latest_release_published_at:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "⏱️ " + str(
-                project.cargo_latest_release_published_at.strftime("%d.%m.%Y")
+            metrics_md += utils.alt(
+                utils.LAST_UPDATE_TIMESTAMP_TEXT,
+                "⏱️ "
+                + str(project.cargo_latest_release_published_at.strftime("%d.%m.%Y")),
             )
 
         if metrics_md:
@@ -127,4 +139,5 @@ class CargoIntegration(BaseIntegration):
         if configuration.generate_install_hints:
             # TODO: Cargo install only works for binary packages
             details_md += "\t```\n\tcargo install {cargo_id}\n\t```\n"
+
         return details_md.format(cargo_id=cargo_id)

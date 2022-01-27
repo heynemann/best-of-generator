@@ -21,6 +21,7 @@ def generate_metrics_info(project: Dict, configuration: Dict) -> str:
 
     if project.projectrank:
         placing_emoji = "🥉"
+
         if project.projectrank_placing:
             if project.projectrank_placing == 1:
                 placing_emoji = "🥇"
@@ -28,19 +29,30 @@ def generate_metrics_info(project: Dict, configuration: Dict) -> str:
                 placing_emoji = "🥈"
 
         # TODO: add spacing? " " ?
-        metrics_md += placing_emoji + str(project.projectrank)
+        placing_title = utils.alt(
+            "Combined project-quality score", placing_emoji + str(project.projectrank)
+        )
+
+        metrics_md += placing_title
 
     if project.star_count:
         if metrics_md:
             metrics_md += " · "
-        metrics_md += " ⭐ " + str(utils.simplify_number(project.star_count))
+
+        star_title = utils.alt(
+            "Star count from GitHub",
+            " ⭐ " + str(utils.simplify_number(project.star_count)),
+        )
+        metrics_md += star_title
 
     status_md = ""
     project_total_month = None
+
     if project.created_at:
         project_total_month = utils.diff_month(datetime.now(), project.created_at)
 
     project_inactive_month = None
+
     if project.last_commit_pushed_at:
         project_inactive_month = utils.diff_month(
             datetime.now(), project.last_commit_pushed_at
@@ -53,28 +65,28 @@ def generate_metrics_info(project: Dict, configuration: Dict) -> str:
         and configuration.project_dead_months
         and int(configuration.project_dead_months) < project_inactive_month
     ):
-        status_md = "💀"
+        status_md = utils.alt("Dead project (12 months no activity)", "💀")
     elif (
         project_inactive_month
         and configuration.project_inactive_months
         and int(configuration.project_inactive_months) < project_inactive_month
     ):
-        status_md = "💤"
+        status_md = utils.alt("Inactive project (6 months no activity)", "💤")
     elif (
         project_total_month
         and configuration.project_new_months
         and int(configuration.project_new_months) >= project_total_month
     ):
-        status_md = "🐣"
+        status_md = utils.alt("New project (less than 6 months old)", "🐣")
     elif project.commercial:
-        status_md = "💲"
+        status_md = utils.alt("Commercial project", "💲")
     elif project.trending:
         if project.trending > 0:
-            status_md = "📈"
+            status_md = utils.alt("Project is trending up", "📈")
         elif project.trending < 0:
-            status_md = "📉"
+            status_md = utils.alt("Project is trending down", "📉")
     elif project.new_addition:
-        status_md = "➕"
+        status_md = utils.alt("Project was recently added", "➕")
 
     if status_md and metrics_md:
         metrics_md = metrics_md + " · " + status_md
@@ -95,13 +107,16 @@ def generate_metrics_info(project: Dict, configuration: Dict) -> str:
 
 def get_label_info(label: str, labels: list) -> Dict:
     labels_map = {}
+
     for label_info in labels:
         label_info = Dict(label_info)
+
         if not label_info.label:
             continue
         labels_map[utils.simplify_str(label_info.label)] = label_info
 
     label_query = utils.simplify_str(label)
+
     if label_query not in labels_map:
         return Dict({"name": label})
 
@@ -123,34 +138,51 @@ def generate_project_labels(project: Dict, labels: list) -> Tuple[str, int]:
 
         if label_info.ignore:
             # Label should not be displayed
+
             continue
 
         if not label_info.image and not label_info.name:
             # no image or name is given, do not add the label
             # this should not happen
+
             continue
 
+        label_description_alt = 'alt="{description}" title="{description}"'.format(
+            description=label_info.description
+        )
         label_md = ""
+
         if label_info.image and label_info.name:
             labels_text_length += len(label_info.name) + IMAGE_LABEL_LENGTH
 
-            label_md = '<code><img src="{image}" style="display:inline;" width="13" height="13">{name}</code>'.format(
-                image=label_info.image, name=label_info.name
+            label_md = '<code><img {label_description_alt} src="{image}" style="display:inline;" width="13" height="13">{name}</code>'.format(
+                image=label_info.image,
+                name=label_info.name,
+                label_description_alt=label_description_alt,
             )
         elif label_info.image:
             labels_text_length += IMAGE_LABEL_LENGTH
 
-            label_md = '<code><img src="{image}" style="display:inline;" width="13" height="13"></code>'.format(
-                image=label_info.image
+            label_md = '<code><img {label_description_alt} src="{image}" style="display:inline;" width="13" height="13"></code>'.format(
+                image=label_info.image,
+                label_description_alt=label_description_alt,
             )
         elif label_info.name:
             labels_text_length += len(label_info.name)
-            label_md = "<code>{name}</code>".format(name=label_info.name)
+            label_md = "<code {label_description_alt}>{name}</code>".format(
+                name=label_info.name,
+                label_description_alt=label_description_alt,
+            )
 
         if label_info.url:
             # Add link to label
             # target="_blank"?
-            label_md = '<a href="' + label_info.url + '">' + label_md + "</a>"
+            url = label_info.url
+            label_md = '<a {label_description_alt} href="{url}">{label_md}</a>'.format(
+                label_description_alt=label_description_alt,
+                url=url,
+                label_md=label_md,
+            )
 
         if label_md:
             # Add a single space in front of label:
@@ -166,11 +198,13 @@ def generate_license_info(project: Dict, configuration: Dict) -> Tuple[str, int]
 
     license_length = 12
     license_md = ""
+
     if project.license:
         licenses_name = project.license
         licenses_warning = True
 
         # License can be a url
+
         if licenses_name.startswith("http://") or licenses_name.startswith("https://"):
             licenses_url = licenses_name
             licenses_name = "Custom"
@@ -183,8 +217,10 @@ def generate_license_info(project: Dict, configuration: Dict) -> Tuple[str, int]
             if license_metadata:
                 if license_metadata.name:
                     licenses_name = license_metadata.name
+
                 if license_metadata.url:
                     licenses_url = license_metadata.url
+
                 if "warning" in license_metadata:
                     licenses_warning = license_metadata.warning
 
@@ -200,6 +236,7 @@ def generate_license_info(project: Dict, configuration: Dict) -> Tuple[str, int]
             license_md += " <code>Unlicensed</code>"
         else:
             license_md += " <code>❗Unlicensed</code>"
+
     return license_md, license_length
 
 
@@ -210,20 +247,24 @@ def generate_project_body(project: Dict, configuration: Dict, labels: list) -> s
         if project.projects and len(project.projects) > 0:
             body_md += "\n---\n"
             hidden_project_counter = 0
+
             for sub_project in project.projects:
                 if sub_project.show is False:
                     hidden_project_counter += 1
+
                     continue
 
                 # Generate project body for all grouped projects
                 project_md = generate_project_md(sub_project, configuration, labels)
                 body_md += project_md + "\n"
+
             if hidden_project_counter > 0:
                 body_md += f"\n<br>\n\n _{hidden_project_counter} projects are hidden because they don't fulfill the minimal requirements._\n"
             body_md += "\n---\n"
         else:
             body_md = "- _Group does not have any projects._"
         body_md = "\n\n" + body_md
+
         return body_md
 
     if project.github_id:
@@ -231,6 +272,7 @@ def generate_project_body(project: Dict, configuration: Dict, labels: list) -> s
 
     for package_manager in integrations.AVAILABLE_PACKAGE_MANAGER:
         package_manager_id = package_manager.name.lower().strip() + "_id"
+
         if package_manager_id in project and project[package_manager_id]:
             body_md += package_manager.generate_md_details(project, configuration)
 
@@ -239,6 +281,7 @@ def generate_project_body(project: Dict, configuration: Dict, labels: list) -> s
         body_md = "- _No project information available._"
 
     body_md = "\n\n" + body_md
+
     return body_md
 
 
@@ -257,6 +300,7 @@ def generate_project_md(
     # TODO: use labels_lenght
 
     metadata_md = ""
+
     if license_md and labels_md:
         # TODO: add " · " in between?
         metadata_md = license_md + labels_md
@@ -273,6 +317,7 @@ def generate_project_md(
     # Dynamically calculate the max length of the description.
     # The goal is that it fits into one row in most cases.
     label_count = 0
+
     if project.labels:
         label_count = len(project.labels)
 
@@ -295,6 +340,7 @@ def generate_project_md(
     description = utils.process_description(project.description, desc_length)
 
     # target="_blank"
+
     if project.resource:
         if description:
             description = f"- {description}"
@@ -342,11 +388,13 @@ def generate_category_md(
         and not category.hidden_projects
     ):
         # Do not show category
+
         return ""
 
     category_md: str = ""
     category_md += title_md_prefix + " " + category.title + "\n\n"
     back_to_top_anchor = "#contents"
+
     if not config.generate_toc:
         # Use # anchor to get back to top of repo
         back_to_top_anchor = "#"
@@ -367,6 +415,7 @@ def generate_category_md(
             + str(len(category.hidden_projects))
             + " hidden projects...</summary>\n\n"
         )
+
         for project in category.hidden_projects:
             project_md = generate_project_md(
                 project, config, labels, generate_body=False
@@ -384,6 +433,7 @@ def generate_changes_md(projects: list, config: Dict, labels: list) -> str:
 
     for project in projects:
         project = Dict(project)
+
         if project.trending:
             if project.trending > 0:
                 trending_up_projects.append(project)
@@ -397,6 +447,7 @@ def generate_changes_md(projects: list, config: Dict, labels: list) -> str:
     if trending_up_projects:
         markdown += "## 📈 Trending Up\n\n"
         markdown += "_Projects that have a higher project-quality score compared to the last update. There might be a variety of reasons, such as increased downloads or code activity._\n\n"
+
         for project in trending_up_projects:
             project_md = generate_project_md(
                 project, config, labels, generate_body=False
@@ -407,6 +458,7 @@ def generate_changes_md(projects: list, config: Dict, labels: list) -> str:
     if trending_down_projects:
         markdown += "## 📉 Trending Down\n\n"
         markdown += "_Projects that have a lower project-quality score compared to the last update. There might be a variety of reasons such as decreased downloads or code activity._\n\n"
+
         for project in trending_down_projects:
             project_md = generate_project_md(
                 project, config, labels, generate_body=False
@@ -417,6 +469,7 @@ def generate_changes_md(projects: list, config: Dict, labels: list) -> str:
     if added_projects:
         markdown += "## ➕ Added Projects\n\n"
         markdown += "_Projects that were recently added to this best-of list._\n\n"
+
         for project in added_projects:
             project_md = generate_project_md(
                 project, config, labels, generate_body=False
@@ -455,6 +508,7 @@ def generate_legend(
     )
     legend_md += "- 📈📉&nbsp; Project is trending up or down\n"
     legend_md += "- ➕&nbsp; Project was recently added\n"
+
     if not configuration.hide_project_license and not configuration.hide_license_risk:
         legend_md += "- ❗️&nbsp; Warning _(e.g. missing/risky license)_\n"
     legend_md += "- 👨‍💻&nbsp; Contributors count from GitHub\n"
@@ -468,9 +522,11 @@ def generate_legend(
     if configuration.show_labels_in_legend:
         for label in labels:
             label_info = Dict(label)
+
             if label_info.ignore:
                 continue
             # Add image labels to explanations
+
             if label_info.image and label_info.description:
                 legend_md += '- <img src="{image}" style="display:inline;" width="13" height="13">&nbsp; {description}\n'.format(
                     image=label_info.image, description=label_info.description
@@ -481,21 +537,26 @@ def generate_legend(
 
 def process_md_link(text: str) -> str:
     text = text.lower().replace(" ", "-")
+
     return re.compile(r"[^a-zA-Z0-9-]").sub("", text)
 
 
 def generate_toc(categories: OrderedDict, config: Dict) -> str:
     toc_md = "## Contents\n\n"
+
     for category in categories:
         category_info = Dict(categories[category])
+
         if category_info.ignore:
             continue
 
         url = "#" + process_md_link(category_info.title)
 
         project_count = 0
+
         if category_info.projects:
             project_count += len(category_info.projects)
+
         if category_info.hidden_projects:
             project_count += len(category_info.hidden_projects)
 
@@ -504,11 +565,13 @@ def generate_toc(categories: OrderedDict, config: Dict) -> str:
             or category == default_config.DEFAULT_OTHERS_CATEGORY_ID
         ):
             # only add if more than 0 projects
+
             continue
 
         toc_md += "- [{title}]({url}) _{project_count} projects_\n".format(
             title=category_info.title, url=url, project_count=project_count
         )
+
     return toc_md + "\n"
 
 
@@ -521,6 +584,7 @@ def generate_md(categories: OrderedDict, config: Dict, labels: list) -> str:
 
     for category_name in categories:
         category = categories[category_name]
+
         if not config.hide_empty_categories or (
             category.projects or category.hidden_projects
         ):
@@ -533,17 +597,21 @@ def generate_md(categories: OrderedDict, config: Dict, labels: list) -> str:
                     for sub_project in project.projects:
                         # Count sub projects of group projects
                         project_count += 1
+
                         if sub_project.star_count:
                             stars_count += sub_project.star_count
                     # Do not count group project
+
                     continue
                 project_count += 1
+
                 if project.star_count:
                     stars_count += project.star_count
 
         if category.hidden_projects:
             for project in category.hidden_projects:
                 project_count += 1
+
                 if project.star_count:
                     stars_count += project.star_count
 
@@ -591,6 +659,7 @@ def generate_md(categories: OrderedDict, config: Dict, labels: list) -> str:
                 "The markdown footer file does not exist: "
                 + os.path.abspath(config.markdown_footer_file)
             )
+
     return full_markdown
 
 

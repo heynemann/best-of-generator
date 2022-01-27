@@ -40,6 +40,7 @@ class CondaIntegration(BaseIntegration):
 
     def generate_md_details(self, project: Dict, configuration: Dict) -> str:
         conda_id = project.conda_id
+
         if not conda_id:
             return ""
 
@@ -48,33 +49,40 @@ class CondaIntegration(BaseIntegration):
         if project.conda_total_downloads:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "📥 " + str(
-                utils.simplify_number(project.conda_total_downloads)
+            metrics_md += utils.alt(
+                utils.DOWNLOAD_COUNT_TEXT,
+                "📥 " + str(utils.simplify_number(project.conda_total_downloads)),
             )
 
         if project.conda_dependent_project_count:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "📦 " + str(
-                utils.simplify_number(project.conda_dependent_project_count)
+            metrics_md += utils.alt(
+                utils.DEPENDENT_PROJECT_COUNT_TEXT,
+                "📦 "
+                + str(utils.simplify_number(project.conda_dependent_project_count)),
             )
 
         if project.conda_latest_release_published_at:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "⏱️ " + str(
-                project.conda_latest_release_published_at.strftime("%d.%m.%Y")
+            metrics_md += utils.alt(
+                utils.LAST_UPDATE_TIMESTAMP_TEXT,
+                "⏱️ "
+                + str(project.conda_latest_release_published_at.strftime("%d.%m.%Y")),
             )
 
         if metrics_md:
             metrics_md = " (" + metrics_md + ")"
 
         conda_url = ""
+
         if project.conda_url:
             conda_url = project.conda_url
 
         conda_package = project.conda_id
         conda_channel = "anaconda"
+
         if "/" in project.conda_id:
             # different channel
             conda_channel = project.conda_id.split("/")[0]
@@ -94,6 +102,7 @@ class CondaIntegration(BaseIntegration):
             details_md += (
                 "\t```\n\tconda install -c {conda_channel} {conda_package}\n\t```\n"
             )
+
         return details_md.format(
             conda_channel=conda_channel, conda_package=conda_package
         )
@@ -101,12 +110,14 @@ class CondaIntegration(BaseIntegration):
     def update_via_conda_api(self, project_info: Dict) -> None:
         try:
             conda_package = project_info.conda_id
+
             if "/" not in conda_package:
                 # Add anaconda as default channel, if channel not provided
                 conda_package = "anaconda/" + project_info.conda_id
 
             request = requests.get("https://api.anaconda.org/package/" + conda_package)
             request.text
+
             if request.status_code != 200:
                 log.info(
                     "Unable to find package via conda api: "
@@ -115,13 +126,16 @@ class CondaIntegration(BaseIntegration):
                     + str(request.status_code)
                     + ")"
                 )
+
                 return
             conda_info = Dict(request.json())
 
             created_at = None
+
             if conda_info.created_at:
                 try:
                     created_at = parse(str(conda_info.created_at), ignoretz=True)
+
                     if (
                         not project_info.created_at
                         or project_info.created_at > created_at
@@ -139,6 +153,7 @@ class CondaIntegration(BaseIntegration):
                     # Set as latest release publish date
                     project_info.conda_latest_release_published_at = updated_at
                     # Update update date from project
+
                     if (
                         not project_info.updated_at
                         or project_info.updated_at < updated_at
@@ -151,6 +166,7 @@ class CondaIntegration(BaseIntegration):
                     )
 
             total_downloads = 0
+
             if conda_info.files:
                 for package_file in conda_info.files:
                     total_downloads += int(package_file.ndownloads)
@@ -159,6 +175,7 @@ class CondaIntegration(BaseIntegration):
                 project_info.conda_total_downloads = total_downloads
 
                 # Add to monthly downloads
+
                 if not project_info.monthly_downloads:
                     project_info.monthly_downloads = 0
 
@@ -171,6 +188,7 @@ class CondaIntegration(BaseIntegration):
 
             if conda_info.versions:
                 version_count = len(conda_info.versions)
+
                 if (
                     not project_info.release_count
                     or int(project_info.release_count) < version_count
@@ -192,4 +210,5 @@ class CondaIntegration(BaseIntegration):
                 "Failed to request package via conda api: " + project_info.conda_id,
                 exc_info=ex,
             )
+
             return

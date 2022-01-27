@@ -35,6 +35,7 @@ class NpmIntegration(BaseIntegration):
                 + quote(project_info.npm_id, safe="")
             )
             request.text
+
             if request.status_code != 200:
                 log.info(
                     "Unable to find package via npm api: "
@@ -43,8 +44,10 @@ class NpmIntegration(BaseIntegration):
                     + str(request.status_code)
                     + ")"
                 )
+
                 return
             npm_download_info = Dict(request.json())
+
             if npm_download_info.downloads:
                 project_info.npm_monthly_downloads = int(npm_download_info.downloads)
 
@@ -58,6 +61,7 @@ class NpmIntegration(BaseIntegration):
                 "Failed to request package via npm api: " + project_info.npm_id,
                 exc_info=ex,
             )
+
             return
 
         # TODO use npms-api to get additional details:
@@ -65,37 +69,44 @@ class NpmIntegration(BaseIntegration):
 
     def generate_md_details(self, project: Dict, configuration: Dict) -> str:
         npm_id = project.npm_id
+
         if not npm_id:
             return ""
 
         metrics_md = ""
+
         if project.npm_monthly_downloads:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += (
+            metrics_md += utils.alt(
+                utils.DOWNLOAD_COUNT_TEXT,
                 "📥 "
                 + str(utils.simplify_number(project.npm_monthly_downloads))
-                + " / month"
+                + " / month",
             )
 
         if project.npm_dependent_project_count:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "📦 " + str(
-                utils.simplify_number(project.npm_dependent_project_count)
+            metrics_md += utils.alt(
+                utils.DEPENDENT_PROJECT_COUNT_TEXT,
+                "📦 " + str(utils.simplify_number(project.npm_dependent_project_count)),
             )
 
         if project.npm_latest_release_published_at:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "⏱️ " + str(
-                project.npm_latest_release_published_at.strftime("%d.%m.%Y")
+            metrics_md += utils.alt(
+                utils.LAST_UPDATE_TIMESTAMP_TEXT,
+                "⏱️ "
+                + str(project.npm_latest_release_published_at.strftime("%d.%m.%Y")),
             )
 
         if metrics_md:
             metrics_md = " (" + metrics_md + ")"
 
         npm_url = ""
+
         if project.npm_url:
             npm_url = project.npm_url
 
@@ -111,4 +122,5 @@ class NpmIntegration(BaseIntegration):
 
         if configuration.generate_install_hints:
             details_md += "\t```\n\tnpm install {npm_id}\n\t```\n"
+
         return details_md.format(npm_id=npm_id)

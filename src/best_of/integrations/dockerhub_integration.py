@@ -22,6 +22,7 @@ class DockerhubIntegration(BaseIntegration):
 
         if not project_info.dockerhub_url:
             dockerhub_url_id = project_info.dockerhub_id
+
             if "/" not in dockerhub_url_id:
                 # if official image, it needs a _/ appended to the id to be requested via url
                 dockerhub_url_id = "_/" + dockerhub_url_id
@@ -30,6 +31,7 @@ class DockerhubIntegration(BaseIntegration):
 
         try:
             dockerhub_url_id = project_info.dockerhub_id
+
             if "/" not in dockerhub_url_id:
                 # if official image, it needs a library/ appended to the id to be requested via url
                 dockerhub_url_id = "library/" + dockerhub_url_id
@@ -37,6 +39,7 @@ class DockerhubIntegration(BaseIntegration):
             request = requests.get(
                 "https://hub.docker.com/v2/repositories/" + dockerhub_url_id
             )
+
             if request.status_code != 200:
                 log.info(
                     "Unable to find image via dockerhub api: "
@@ -45,6 +48,7 @@ class DockerhubIntegration(BaseIntegration):
                     + str(request.status_code)
                     + ")"
                 )
+
                 return
             dockerhub_info = Dict(request.json())
         except Exception as ex:
@@ -53,6 +57,7 @@ class DockerhubIntegration(BaseIntegration):
                 + project_info.dockerhub_id,
                 exc_info=ex,
             )
+
             return
 
         if not dockerhub_info.name:
@@ -61,11 +66,13 @@ class DockerhubIntegration(BaseIntegration):
                 "Failed to request docker image via dockerhub api: "
                 + project_info.dockerhub_id
             )
+
             return
 
         if dockerhub_info.last_updated:
             try:
                 updated_at = parse(str(dockerhub_info.last_updated), ignoretz=True)
+
                 if not project_info.updated_at:
                     project_info.updated_at = updated_at
                 elif project_info.updated_at < updated_at:
@@ -81,6 +88,7 @@ class DockerhubIntegration(BaseIntegration):
 
         if dockerhub_info.star_count:
             project_info.dockerhub_stars = dockerhub_info.star_count
+
             if not project_info.star_count:
                 project_info.star_count = 0
             # Add dockerhub stars to total star count
@@ -88,8 +96,10 @@ class DockerhubIntegration(BaseIntegration):
 
         if dockerhub_info.pull_count:
             project_info.dockerhub_pulls = int(dockerhub_info.pull_count)
+
             if project_info.created_at:
                 # Add to monthly downloads
+
                 if not project_info.monthly_downloads:
                     project_info.monthly_downloads = 0
 
@@ -109,31 +119,44 @@ class DockerhubIntegration(BaseIntegration):
 
     def generate_md_details(self, project: Dict, configuration: Dict) -> str:
         dockerhub_id = project.dockerhub_id
+
         if not dockerhub_id:
             return ""
 
         metrics_md = ""
+
         if project.dockerhub_pulls:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "📥 " + str(utils.simplify_number(project.dockerhub_pulls))
+            metrics_md += utils.alt(
+                utils.DOWNLOAD_COUNT_TEXT,
+                "📥 " + str(utils.simplify_number(project.dockerhub_pulls)),
+            )
 
         if project.dockerhub_stars:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "⭐ " + str(utils.simplify_number(project.dockerhub_stars))
+            metrics_md += utils.alt(
+                "Star count from Docker",
+                "⭐ " + str(utils.simplify_number(project.dockerhub_stars)),
+            )
 
         if project.dockerhub_latest_release_published_at:
             if metrics_md:
                 metrics_md += " · "
-            metrics_md += "⏱️ " + str(
-                project.dockerhub_latest_release_published_at.strftime("%d.%m.%Y")
+            metrics_md += utils.alt(
+                utils.LAST_UPDATE_TIMESTAMP_TEXT,
+                "⏱️ "
+                + str(
+                    project.dockerhub_latest_release_published_at.strftime("%d.%m.%Y")
+                ),
             )
 
         if metrics_md:
             metrics_md = " (" + metrics_md + ")"
 
         dockerhub_url = ""
+
         if project.dockerhub_url:
             dockerhub_url = project.dockerhub_url
 
@@ -151,4 +174,5 @@ class DockerhubIntegration(BaseIntegration):
 
         if configuration.generate_install_hints:
             details_md += "\t```\n\tdocker pull {dockerhub_id}\n\t```\n"
+
         return details_md.format(dockerhub_id=dockerhub_id)
